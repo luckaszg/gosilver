@@ -7,6 +7,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/google/uuid"
 )
 
 
@@ -57,8 +59,7 @@ func (gs GoSilverDB) createTable(tableName string) {
 	}
 
 	if _, ok := deserializedContent[tableName]; ok {
-		fmt.Printf("Table '%s' already in Database", tableName)
-		fmt.Println()
+		fmt.Printf("Table '%s' already in Database\n", tableName)
 		return
 	}
 	// END. Check if table name already exists section
@@ -75,8 +76,51 @@ func (gs GoSilverDB) createTable(tableName string) {
 	//END. Adding new table name to database object
 }
 
-func (gs GoSilverDB) write(fileContent JSON) {
+func (gs GoSilverDB) write(tableName string, fileContent JSON) {
+	itemUuid, err := uuid.NewV7();
+	if err != nil {
+		log.Fatal("Error while generating UUID for table", err)
+	}
 
+	fileContent["id"] = itemUuid
+
+	f, err := os.OpenFile(gs.path, os.O_RDWR, 0644)
+
+	if err != nil {
+		log.Fatal("Error while opening file")
+	}
+
+	defer f.Close()
+
+	// START. Check if table name already exists section
+	content, err := io.ReadAll(f)
+
+	if err != nil {
+		log.Fatal("Error while reading the content of file")
+	}
+
+	var deserializedContent map[string]any
+	err = json.Unmarshal([]byte(string(content)), &deserializedContent)
+	if err != nil {
+		log.Fatal("Error while parsing file content to JSON", err)
+	}
+
+	table, ok := deserializedContent[tableName].(map[string]any)
+	if !ok {
+		fmt.Printf("Table '%s' doesn't exist in database\n", tableName)
+		return
+	}
+	table[itemUuid.String()] = fileContent
+
+	// START. Adding new table name to database object
+	tableData, err := json.Marshal(deserializedContent)
+	if err != nil {
+		log.Fatal("Error whle encoding table name to JSON")
+	}
+	if err = os.WriteFile(gs.path, tableData, 0660); err != nil {
+		log.Fatal("Error while trying to insert the table data", err)
+	}
+	//END. Adding new table name to database object
 }
 
 func main() {
@@ -89,16 +133,26 @@ func main() {
 	// Create table and return
 	db.createTable("user")
 	db.createTable("market")
-	db.createTable("client")
+	// db.createTable("client")
 
 	// Get table
 	//table = db.getTable("users")
 
 	// Write opperation
-	//db.write()
+	lucasGuerreroData := map[string]any{"name": "Lucas Guerrero", "year_joined": 2026, "title": "software engineer"}
+	nelsonRojasData := map[string]any{"name": "Nelson Rojas", "year_joined": 2025, "title": "senior software engineer"}
+	db.write("user", lucasGuerreroData)
+	db.write("user", nelsonRojasData)
+
+	nvidiaMarket := map[string]any{"name": "NVIDIA Corporation", "symbol": "NVDA", "active": true}
+	anthropicMarket := map[string]any{"name": "Anthropic", "symbol": "ANT", "active": true}
+	lehmanBrothersMarket := map[string]any{"name": "Lehman Brothers", "symbol": "LEHM", "active": false}
+	db.write("market", nvidiaMarket)
+	db.write("market", anthropicMarket)
+	db.write("market", lehmanBrothersMarket)
 
 	// Read opperation (by field)
-	//db.read()
+	//db.read("user", unique_field)
 
 	fmt.Print(db.path)
 }
