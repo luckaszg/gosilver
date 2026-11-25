@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -123,6 +124,42 @@ func (gs GoSilverDB) write(tableName string, fileContent JSON) {
 	//END. Adding new table name to database object
 }
 
+func (gs GoSilverDB) read(tableName string, itemUuid string) (JSON, error) {
+	f, err := os.OpenFile(gs.path, os.O_RDWR, 0644)
+
+	if err != nil {
+		log.Fatal("Error while opening file")
+	}
+
+	defer f.Close()
+
+	// START. Check if table name already exists section
+	content, err := io.ReadAll(f)
+
+	if err != nil {
+		log.Fatal("Error while reading the content of file")
+	}
+
+	var deserializedContent map[string]any
+	err = json.Unmarshal([]byte(string(content)), &deserializedContent)
+	if err != nil {
+		log.Fatal("Error while parsing file content to JSON", err)
+	}
+
+	table, ok := deserializedContent[tableName].(map[string]any)
+	if !ok {
+		fmt.Printf("Table '%s' doesn't exist in database\n", tableName)
+		return nil, errors.New("Table doesn't exist in database")
+	}
+
+	record, ok := table[itemUuid].(map[string]any)
+	if !ok {
+		fmt.Printf("Record with UUID '%s' doesn't exist in table '%s'", itemUuid, tableName)
+		return nil, errors.New("Record doesn't exist in table")
+	}
+	return record, nil
+}
+
 func main() {
 	db, err := GoSilver("userdata")
 	if err != nil {
@@ -152,7 +189,17 @@ func main() {
 	db.write("market", lehmanBrothersMarket)
 
 	// Read opperation (by field)
-	//db.read("user", unique_field)
+	nvidia, err := db.read("market", "01a20fb0-6e11-72a7-b46f-189b7aeec495")
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(nvidia["name"])
 
-	fmt.Print(db.path)
+	lucas, err := db.read("user", "01a20fb0-6e10-7cd7-a93d-900d79001a06")
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(lucas["name"])
+
+	// fmt.Print(db.path)
 }
