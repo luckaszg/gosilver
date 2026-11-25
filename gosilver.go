@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gosilver/utils"
 	"io"
 	"log"
 	"os"
@@ -16,8 +17,6 @@ import (
 type GoSilverDB struct {
 	path string
 }
-
-type JSON map[string]any
 
 func GoSilver(fileName string) (*GoSilverDB, error) {
 	if err := os.MkdirAll("db", 0750); err != nil {
@@ -77,7 +76,7 @@ func (gs GoSilverDB) createTable(tableName string) {
 	//END. Adding new table name to database object
 }
 
-func (gs GoSilverDB) write(tableName string, fileContent JSON) {
+func (gs GoSilverDB) write(tableName string, fileContent utils.JSON) {
 	itemUuid, err := uuid.NewV7();
 	if err != nil {
 		log.Fatal("Error while generating UUID for table", err)
@@ -124,7 +123,7 @@ func (gs GoSilverDB) write(tableName string, fileContent JSON) {
 	//END. Adding new table name to database object
 }
 
-func (gs GoSilverDB) read(tableName string, itemUuid string) (JSON, error) {
+func (gs GoSilverDB) read(tableName string, itemUuid string) (utils.JSON, error) {
 	f, err := os.OpenFile(gs.path, os.O_RDWR, 0644)
 
 	if err != nil {
