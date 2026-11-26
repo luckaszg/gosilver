@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"gosilver/utils"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -37,115 +36,69 @@ func GoSilver(fileName string) (*GoSilverDB, error) {
 
 func (gs GoSilverDB) createTable(tableName string) {
 
-	f, err := os.OpenFile(gs.path, os.O_RDWR, 0644)
+	currentState, err := utils.GetGosilverState(gs.path)
 
 	if err != nil {
-		log.Fatal("Error while opening file")
+		fmt.Printf("Error while getting database state\n")
 	}
-
-	defer f.Close()
-
-	// START. Check if table name already exists section
-	content, err := io.ReadAll(f)
-
-	if err != nil {
-		log.Fatal("Error while reading the content of file")
-	}
-
-	var deserializedContent map[string]any
-	err = json.Unmarshal([]byte(string(content)), &deserializedContent)
-	if err != nil {
-		log.Fatal("Error while parsing file content to JSON", err)
-	}
-
-	if _, ok := deserializedContent[tableName]; ok {
+	
+	// Check if the table name is already in database state
+	if _, ok := currentState[tableName]; ok {
 		fmt.Printf("Table '%s' already in Database\n", tableName)
 		return
 	}
-	// END. Check if table name already exists section
 
-	// START. Adding new table name to database object
-	deserializedContent[tableName] = map[string]any{}
-	tableData, err := json.Marshal(deserializedContent)
+	// If table name is not in the state, proceed to add it
+	currentState[tableName] = map[string]any{}
+	tableData, err := json.Marshal(currentState)
 	if err != nil {
 		log.Fatal("Error whle encoding table name to JSON")
 	}
 	if err = os.WriteFile(gs.path, tableData, 0660); err != nil {
 		log.Fatal("Error while trying to insert the table name", err)
 	}
-	//END. Adding new table name to database object
 }
 
 func (gs GoSilverDB) write(tableName string, fileContent utils.JSON) {
+	currentState, err := utils.GetGosilverState(gs.path)
+
+	if err != nil {
+		fmt.Printf("Error while getting database state\n")
+	}
+
+	table, ok := currentState[tableName].(map[string]any)
+	if !ok {
+		fmt.Printf("Table '%s' doesn't exist in database\n", tableName)
+		return
+	}
+
+	// Assign uuid to JSON and as table key
 	itemUuid, err := uuid.NewV7();
 	if err != nil {
 		log.Fatal("Error while generating UUID for table", err)
 	}
 
 	fileContent["id"] = itemUuid
-
-	f, err := os.OpenFile(gs.path, os.O_RDWR, 0644)
-
-	if err != nil {
-		log.Fatal("Error while opening file")
-	}
-
-	defer f.Close()
-
-	// START. Check if table name already exists section
-	content, err := io.ReadAll(f)
-
-	if err != nil {
-		log.Fatal("Error while reading the content of file")
-	}
-
-	var deserializedContent map[string]any
-	err = json.Unmarshal([]byte(string(content)), &deserializedContent)
-	if err != nil {
-		log.Fatal("Error while parsing file content to JSON", err)
-	}
-
-	table, ok := deserializedContent[tableName].(map[string]any)
-	if !ok {
-		fmt.Printf("Table '%s' doesn't exist in database\n", tableName)
-		return
-	}
 	table[itemUuid.String()] = fileContent
 
 	// START. Adding new table name to database object
-	tableData, err := json.Marshal(deserializedContent)
+	currentStateJson, err := json.Marshal(currentState)
 	if err != nil {
 		log.Fatal("Error whle encoding table name to JSON")
 	}
-	if err = os.WriteFile(gs.path, tableData, 0660); err != nil {
+	if err = os.WriteFile(gs.path, currentStateJson, 0660); err != nil {
 		log.Fatal("Error while trying to insert the table data", err)
 	}
-	//END. Adding new table name to database object
 }
 
 func (gs GoSilverDB) read(tableName string, itemUuid string) (utils.JSON, error) {
-	f, err := os.OpenFile(gs.path, os.O_RDWR, 0644)
+	currentState, err := utils.GetGosilverState(gs.path)
 
 	if err != nil {
-		log.Fatal("Error while opening file")
+		fmt.Printf("Error while getting database state\n")
 	}
 
-	defer f.Close()
-
-	// START. Check if table name already exists section
-	content, err := io.ReadAll(f)
-
-	if err != nil {
-		log.Fatal("Error while reading the content of file")
-	}
-
-	var deserializedContent map[string]any
-	err = json.Unmarshal([]byte(string(content)), &deserializedContent)
-	if err != nil {
-		log.Fatal("Error while parsing file content to JSON", err)
-	}
-
-	table, ok := deserializedContent[tableName].(map[string]any)
+	table, ok := currentState[tableName].(map[string]any)
 	if !ok {
 		fmt.Printf("Table '%s' doesn't exist in database\n", tableName)
 		return nil, errors.New("Table doesn't exist in database")
